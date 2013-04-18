@@ -18,7 +18,7 @@ define([
      * @alias DataSourceCollection
      * @constructor
      */
-    var DataSourceCollection = function DataSourceCollection() {
+    var DataSourceCollection = function() {
         this._dataSources = [];
 
         /**
@@ -34,23 +34,6 @@ define([
          * @type {Event}
          */
         this.dataSourceRemoved = new Event();
-
-        /**
-         * An event that is raised when a data source changes position in the collection.  Event handlers are passed the data source that
-         * was moved, its new index after the move, and its old index prior to the move.
-         * @type {Event}
-         */
-        this.dataSourceMoved = new Event();
-
-        /**
-         * An event that is raised when a data source is shown or hidden by setting the
-         * {@link DataSource#show} property.  Event handlers are passed a reference to this data source,
-         * the index of the data source in the collection, and a flag that is true if the data source is now
-         * shown or false if it is now hidden.
-         *
-         * @type {Event}
-         */
-        this.dataSourceShownOrHidden = new Event();
     };
 
     /**
@@ -65,26 +48,9 @@ define([
      * @exception {DeveloperError} dataSource is required.
      * @exception {DeveloperError} index, if supplied, must be greater than or equal to zero and less than or equal to the number of the data sources.
      */
-    DataSourceCollection.prototype.add = function(dataSource, index) {
-        if (typeof dataSource === 'undefined') {
-            throw new DeveloperError('dataSource is required.');
-        }
-
-        if (typeof index === 'undefined') {
-            index = this._dataSources.length;
-            this._dataSources.push(dataSource);
-        } else {
-            if (index < 0) {
-                throw new DeveloperError('index must be greater than or equal to zero.');
-            } else if (index > this._dataSources.length) {
-                throw new DeveloperError('index must be less than or equal to the number of data sources.');
-            }
-            this._dataSources.splice(index, 0, dataSource);
-        }
-
-        this._update();
-
-        this.dataSourceAdded.raiseEvent(dataSource, index);
+    DataSourceCollection.prototype.add = function(dataSource) {
+        this._dataSources.push(dataSource);
+        this.dataSourceAdded.raiseEvent(this, dataSource);
     };
 
     /**
@@ -99,17 +65,12 @@ define([
      *                    false if the data source was not in the collection.
      */
     DataSourceCollection.prototype.remove = function(dataSource, destroy) {
-        destroy = defaultValue(destroy, true);
-
         var index = this._dataSources.indexOf(dataSource);
         if (index !== -1) {
             this._dataSources.splice(index, 1);
+            this.dataSourceRemoved.raiseEvent(this, dataSource, index);
 
-            this._update();
-
-            this.dataSourceRemoved.raiseEvent(dataSource, index);
-
-            if (destroy) {
+            if (typeof dataSource.destroy === 'function' && destroy) {
                 dataSource.destroy();
             }
 
@@ -127,14 +88,12 @@ define([
      * @param {Boolean} [destroy=true] whether to destroy the data sources in addition to removing them.
      */
     DataSourceCollection.prototype.removeAll = function(destroy) {
-        destroy = defaultValue(destroy, true);
-
         var dataSources = this._dataSources;
         for ( var i = 0, len = dataSources.length; i < len; i++) {
             var dataSource = dataSources[i];
-            this.dataSourceRemoved.raiseEvent(dataSource, i);
+            this.dataSourceRemoved.raiseEvent(this, dataSource, i);
 
-            if (destroy) {
+            if (typeof dataSource.destroy === 'function' && destroy) {
                 dataSource.destroy();
             }
         }
@@ -197,113 +156,6 @@ define([
         return this._dataSources.length;
     };
 
-    function getDataSourceIndex(dataSources, dataSource) {
-        if (typeof dataSource === 'undefined') {
-            throw new DeveloperError('dataSource is required.');
-        }
-
-        var index = dataSources.indexOf(dataSource);
-        if (index === -1) {
-            throw new DeveloperError('dataSource is not in this collection.');
-        }
-
-        return index;
-    }
-
-    function swapDataSources(collection, i, j) {
-        var arr = collection._dataSources;
-        i = CesiumMath.clamp(i, 0, arr.length - 1);
-        j = CesiumMath.clamp(j, 0, arr.length - 1);
-
-        if (i === j) {
-            return;
-        }
-
-        var temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-
-        collection._update();
-
-        collection.dataSourceMoved.raiseEvent(temp, j, i);
-    }
-
-    /**
-     * Raises a data source up one position in the collection.
-     *
-     * @memberof DataSourceCollection
-     *
-     * @param {DataSource} dataSource The data source to move.
-     *
-     * @exception {DeveloperError} dataSource is not in this collection.
-     * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
-     */
-    DataSourceCollection.prototype.raise = function(dataSource) {
-        var index = getDataSourceIndex(this._dataSources, dataSource);
-        swapDataSources(this, index, index + 1);
-    };
-
-    /**
-     * Lowers a data source down one position in the collection.
-     *
-     * @memberof DataSourceCollection
-     *
-     * @param {DataSource} dataSource The data source to move.
-     *
-     * @exception {DeveloperError} dataSource is not in this collection.
-     * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
-     */
-    DataSourceCollection.prototype.lower = function(dataSource) {
-        var index = getDataSourceIndex(this._dataSources, dataSource);
-        swapDataSources(this, index, index - 1);
-    };
-
-    /**
-     * Raises a data source to the top of the collection.
-     *
-     * @memberof DataSourceCollection
-     *
-     * @param {DataSource} dataSource The data source to move.
-     *
-     * @exception {DeveloperError} dataSource is not in this collection.
-     * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
-     */
-    DataSourceCollection.prototype.raiseToTop = function(dataSource) {
-        var index = getDataSourceIndex(this._dataSources, dataSource);
-        if (index === this._dataSources.length - 1) {
-            return;
-        }
-        this._dataSources.splice(index, 1);
-        this._dataSources.push(dataSource);
-
-        this._update();
-
-        this.dataSourceMoved.raiseEvent(dataSource, this._dataSources.length - 1, index);
-    };
-
-    /**
-     * Lowers a data source to the bottom of the collection.
-     *
-     * @memberof DataSourceCollection
-     *
-     * @param {DataSource} dataSource The data source to move.
-     *
-     * @exception {DeveloperError} dataSource is not in this collection.
-     * @exception {DeveloperError} This object was destroyed, i.e., destroy() was called.
-     */
-    DataSourceCollection.prototype.lowerToBottom = function(dataSource) {
-        var index = getDataSourceIndex(this._dataSources, dataSource);
-        if (index === 0) {
-            return;
-        }
-        this._dataSources.splice(index, 1);
-        this._dataSources.splice(0, 0, dataSource);
-
-        this._update();
-
-        this.dataSourceMoved.raiseEvent(dataSource, 0, index);
-    };
-
     /**
      * Returns true if this object was destroyed; otherwise, false.
      * <br /><br />
@@ -343,34 +195,6 @@ define([
     DataSourceCollection.prototype.destroy = function() {
         this.removeAll(true);
         return destroyObject(this);
-    };
-
-    DataSourceCollection.prototype._update = function() {
-        var dataSources = this._dataSources;
-        var dataSourcesShownOrHidden;
-        var dataSource;
-        for ( var i = 0, len = dataSources.length; i < len; ++i) {
-            dataSource = dataSources[i];
-
-            dataSource._dataSourceIndex = i;
-
-            if (dataSource.show !== dataSource._show) {
-                if (typeof dataSource._show !== 'undefined') {
-                    if (typeof dataSourcesShownOrHidden === 'undefined') {
-                        dataSourcesShownOrHidden = [];
-                    }
-                    dataSourcesShownOrHidden.push(dataSource);
-                }
-                dataSource._show = dataSource.show;
-            }
-        }
-
-        if (typeof dataSourcesShownOrHidden !== 'undefined') {
-            for (i = 0, len = dataSourcesShownOrHidden.length; i < len; ++i) {
-                dataSource = dataSourcesShownOrHidden[i];
-                this.dataSourceShownOrHidden.raiseEvent(dataSource, dataSource._dataSourceIndex, dataSource.show);
-            }
-        }
     };
 
     return DataSourceCollection;

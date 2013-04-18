@@ -1,8 +1,8 @@
 /*global define*/
 define(['../Core/DeveloperError',
         '../Core/loadJson',
-        '../DynamicScene/DynamicObjectCollection',
-        '../DynamicScene/processCzml'
+        '../DynamicScene/processCzml',
+        '../DynamicScene/DynamicObjectCollection'
         ], function(
                 DeveloperError,
                 loadJson,
@@ -10,27 +10,25 @@ define(['../Core/DeveloperError',
                 DynamicObjectCollection) {
     "use strict";
 
-    var CzmlDataSource = function(czml) {
+    var CzmlDataSource = function(czml, source) {
         this._dynamicObjectCollection = new DynamicObjectCollection();
         this._clock = undefined;
 
         if (typeof czml !== 'undefined') {
-            processCzml(czml, this._dynamicObjectCollection);
+            processCzml(czml, this._dynamicObjectCollection, source);
         }
     };
 
-    CzmlDataSource.fromString = function(string) {
-        return new CzmlDataSource(JSON.parse(string));
+    CzmlDataSource.fromString = function(string, name) {
+        return new CzmlDataSource(JSON.parse(string), name);
     };
 
     CzmlDataSource.fromUrl = function(url) {
-        var that = new CzmlDataSource();
-        loadJson(url).then(function(czml) {
-            processCzml(czml, that._dynamicObjectCollection, url);
-        }, function(error) {
-            //TODO
+        return loadJson(url).then(function(czml) {
+            var source = new CzmlDataSource();
+            processCzml(czml, source._dynamicObjectCollection, url);
+            return source;
         });
-        return that;
     };
 
     CzmlDataSource.prototype.getClock = function() {
