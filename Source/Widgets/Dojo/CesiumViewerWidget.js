@@ -921,17 +921,23 @@ Earth at night as seen by NASA/NOAA\'s Suomi NPP satellite.',
             this.baseLayerPicker.viewModel.selectedItem(providerViewModels[0]);
 
             if (typeof endUserOptions.source !== 'undefined') {
+                this._setLoading(true);
                 CzmlDataSource.fromUrl(endUserOptions.source).then(function(source) {
                     that.dataSourceDisplay.dataSourceCollection.add(source, endUserOptions.source);
 
                     var dynamicObjectCollection = source.getDynamicObjectCollection();
                     that.setTimeFromBuffer(dynamicObjectCollection);
+                    that._setLoading(false);
 
                     var lookAt = endUserOptions.lookAt;
                     if (typeof lookAt !== 'undefined') {
                         var lookAtObject = dynamicObjectCollection.getObject(lookAt);
                         that.centerCameraOnObject(lookAtObject);
                     }
+                }, function(error) {
+                    that._setLoading(false);
+                    console.error(error);
+                    window.alert(error);
                 });
             }
 
